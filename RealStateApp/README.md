@@ -1,204 +1,114 @@
-# DHA Estate Pro — Real Estate Management System (DHA Karachi)
+DHA Estate Pro
+A full-stack real estate platform for property listings in DHA Karachi. Buyers and tenants can explore properties, save favourites, send inquiries, and request viewings. Owners and agents can manage listings and leads, while admins review listings and manage platform users.
+Features
+- Property search: Filter listings by property type, phase, price, bedrooms, bathrooms, furnishing, and possession status.
+- Listing approval: New listings remain pending until an admin approves them.
+- Role-based dashboards: Separate permissions and workflows for buyers/tenants, owners, agents, and admins.
+- Inquiries and leads: Track inquiries through Pending, Contacted, and Closed.
+- Viewing appointments: Request and manage viewings, with server-side checks for overlapping bookings.
+- Favourites and directories: Save properties and browse agents, projects, and blog posts.
+- Payment sandbox: Record test payments and generate receipt numbers after sandbox confirmation. No live payment gateway is connected.
+Tech Stack
+Area	Technology
+Frontend	React 18, Vite, React Router, Tailwind CSS
+Backend	Node.js, Express
+Database	MongoDB, Mongoose
+Authentication	JWT access and refresh tokens
 
-A full-stack real estate platform: property listings, role-based dashboards,
-inquiries (leads), viewing appointments, admin listing verification, and a
-**sandbox** payment workflow. Frontend: Vite + React 18 + React Router +
-Tailwind CSS. Backend: Node.js + Express + MongoDB (Mongoose).
 
-> **Stack note:** this project was migrated from Next.js to Vite + React on
-> 2026-10-24 at the user's request. The migration was mechanical and
-> behavior-preserving: file-based routing → React Router, `next/link` →
-> `Link`, navigation hooks → `useNavigate`/`useParams`/`useSearchParams`.
-> The backend API is completely unchanged, and all pages, design, and local
-> images work as before. The conversion script is
-> `scripts/migrate_to_react.py`. The previous Next.js build is preserved in
-> `DHA-Estate-Pro-Complete.zip`.
-
-## Quick start
-
-```bash
-# 1. Backend
+Getting Started
+Requirements
+- Node.js 20 or later
+- MongoDB Atlas account or a local MongoDB instance
+- npm
+1. Set up the backend
 cd backend
-cp .env.example .env   # fill in your own values (see below)
+cp .env.example .env
 npm install
-npm run seed           # optional demo data (admin, agents, buyer, listings)
-npm run dev            # API on http://localhost:5000
-
-# 2. Frontend (new terminal)
+Update backend/.env with your own configuration. To load the optional demo data and start the API:
+npm run seed
+npm run dev
+The API runs at http://localhost:5000 by default.
+2. Set up the frontend
+Open another terminal:
 cd frontend
 npm install
-npm run dev            # site on http://localhost:5173
-```
+npm run dev
+Vite will show the local frontend URL, usually http://localhost:5173.
 
-The frontend calls the API at `http://localhost:5000/api` (hardcoded, as
-before). The backend serves uploaded images at `http://localhost:5000/uploads/*`.
+If needed, set the API URL in frontend/.env:
+VITE_API_URL=http://localhost:5000/api
+If VITE_API_URL is not set, the frontend uses http://localhost:5000/api by default.
+Environment Variables
+Backend — backend/.env
+Variable	Purpose
+PORT	API port; defaults to 5000
+MONGODB_URI	MongoDB connection string
+DB_NAME	Database name; defaults to dhaestatepro
+JWT_SECRET	Secret used to sign access tokens
+JWT_REFRESH_SECRET	Secret used to sign refresh tokens
+NODE_ENV	Runtime environment, such as development or production
 
-## Environment variables (backend/.env)
 
-| Variable | Purpose |
-| --- | --- |
-| `PORT` | API port (default `5000`) |
-| `MONGODB_URI` | MongoDB Atlas or local connection string |
-| `DB_NAME` | Database name (default `dhaestatepro`) |
-| `JWT_SECRET` | Access-token secret (1 day expiry) |
-| `JWT_REFRESH_SECRET` | Refresh-token secret (7 day expiry) |
-| `NODE_ENV` | `development` / `production` |
+Frontend — frontend/.env
+Variable	Purpose
+VITE_API_URL	Backend API base URL, including /api
 
-⚠️ **Security:** never commit a filled `.env`. If a real `.env` was ever
-shared or uploaded, rotate the MongoDB password and both JWT secrets
-immediately — old tokens/credentials must be treated as compromised.
-Default seed accounts (demo only, change in production): the seed script
-creates an admin, agents, and a buyer with simple demo passwords.
 
-## Roles & permissions (enforced on the backend)
+Keep real credentials and secrets in your local .env file or hosting provider's environment settings. Never commit a populated .env file to GitHub. Use .env.example as a template.
+User Roles
+Role	Main permissions
+USER	Browse properties, save favourites, submit inquiries, request viewings, and view own payment records
+OWNER	Buyer features plus create and manage own property listings
+AGENT	Manage assigned listings, inquiries, and viewings; view listing analytics
+ADMIN	Manage users, review listings, and access platform-wide data and analytics
 
-| Role | Can do |
-| --- | --- |
-| `USER` (Buyer/Tenant) | Browse/search, view details, save favorites, send inquiries, request viewings, view own payments |
-| `OWNER` (Seller) | Everything a buyer can, plus create/manage **own** listings |
-| `AGENT` | Manage own listings, handle assigned inquiries, manage assigned viewings, view own analytics |
-| `ADMIN` | Everything, plus verify/reject listings, manage users & roles, view all data & analytics |
 
-Public registration **always** creates a `USER`. Nobody can self-assign
-`OWNER`, `AGENT`, or `ADMIN` — only an admin can change roles
-(`PUT /api/auth/users/:id/role`). Auth endpoints are rate-limited
-(50 attempts / IP / 15 min).
-
-## Listing verification workflow
-
-1. Owner/agent submits a listing → status `Pending`.
-2. Public pages (home, listings, search) show **only `Approved`** listings.
-3. Admin approves or rejects from the dashboard (reject with an optional reason).
-4. Owners/agents see their own listings (any status) via `scope=mine`;
-   admins see everything via `scope=all`.
-5. Listings created before this workflow existed were grandfathered as
-   `Approved` (they were already public).
-
-## Images
-
-- All website images live in `frontend/public/images/` and render from
-  there — no property/hero/avatar image is hotlinked anymore. (User avatars
-  from Dicebear and the Mapbox map background are third-party services and
-  intentionally stay remote.)
-- **Every localized image is under 20 KB** (compressed with the
-  `scripts/localize_images.py` script) so pages render fast. Re-run that
-  script if you add new Unsplash images.
-- Agent uploads: dashboard property form → "Or Upload Main Image".
-  **Image should be less than 100 KB** — enforced in the browser *and* on
-  the server (`POST /api/uploads/image` rejects ≥ 100 KB). Uploaded files
-  are stored locally under `backend/src/uploads/` and served at `/uploads/*`.
-
-## API endpoints
-
-Base: `http://localhost:5000/api`
-
-### Auth
-| Method & path | Auth | Notes |
-| --- | --- | --- |
-| `POST /auth/register` | — (rate-limited) | Always creates `USER` |
-| `POST /auth/login` | — (rate-limited) | Returns access + refresh tokens |
-| `POST /auth/refresh` | — | Rotates token pair |
-| `GET /auth/me` | Bearer | Current user |
-| `PUT /auth/profile` | Bearer | Edit name/phone/avatar |
-| `POST /auth/favorites/:propertyId` | Bearer | Toggle favorite |
-| `GET /auth/agents` | — | Agent directory |
-| `GET /auth/users` | ADMIN | User directory |
-| `PUT /auth/users/:id/role` | ADMIN | Change role (`USER/OWNER/AGENT/ADMIN`) |
-| `DELETE /auth/users/:id` | ADMIN | Delete user (default admin protected) |
-
-### Properties
-| Method & path | Auth | Notes |
-| --- | --- | --- |
-| `GET /properties` | optional | Filters: status, type, phase, priceMin/Max, beds, baths, possessionStatus, furnished, query (text), isFeatured, page, limit. `scope=mine` (own), `scope=all` (ADMIN) |
-| `GET /properties/:id` | optional | Hidden unless Approved or owner/admin |
-| `POST /properties` | OWNER/AGENT/ADMIN | Non-admin submissions start `Pending` |
-| `PUT /properties/:id` | owner or ADMIN | Verification fields admin-only |
-| `PUT /properties/:id/verify` | ADMIN | `{ verificationStatus: Approved\|Rejected, rejectionReason? }` |
-| `DELETE /properties/:id` | owner or ADMIN | |
-| `GET /properties/analytics` | OWNER/AGENT | Own listings stats |
-| `GET /properties/admin-analytics` | ADMIN | Platform stats |
-
-### Inquiries (leads)
-Workflow: `Pending → Contacted → Closed`.
-| Method & path | Auth |
-| --- | --- |
-| `POST /leads` | — (public inquiry form) |
-| `GET /leads/me` | Bearer (own inquiries) |
-| `GET /leads/agent` | AGENT (assigned) |
-| `GET /leads/admin` | ADMIN (all) |
-| `PUT /leads/:id` | AGENT/ADMIN (status update) |
-
-### Viewings
-Statuses: `Requested → Confirmed → Completed`, plus `Rescheduled`, `Cancelled`.
-Server blocks overlapping bookings: same property or same agent within the
-same hour for active (`Requested`/`Confirmed`) viewings → `409 Conflict`.
-| Method & path | Auth |
-| --- | --- |
-| `POST /viewings` | Bearer (buyer; body: propertyId, dateTime, notes) |
-| `GET /viewings/me` | Bearer (own) |
-| `GET /viewings/agent` | AGENT (assigned) |
-| `GET /viewings/admin` | ADMIN (all) |
-| `PUT /viewings/:id` | owner/agent/admin (buyers may only cancel/reschedule own) |
-
-### Payments (SANDBOX ONLY)
-No real gateway is integrated. Payments start `Pending`; only the explicit
-sandbox confirm marks them `Confirmed` and issues a receipt number.
-| Method & path | Auth |
-| --- | --- |
-| `POST /payments` | Bearer (body: amount > 0, method, optional propertyId) |
-| `GET /payments/me` | Bearer (own) |
-| `GET /payments/admin` | ADMIN (all) |
-| `PUT /payments/:id/confirm` | owner or ADMIN (Pending → Confirmed + receipt) |
-| `PUT /payments/:id/status` | owner/ADMIN (`Failed` from Pending; ADMIN-only `Refunded` from Confirmed) |
-
-### Uploads
-| Method & path | Auth | Notes |
-| --- | --- | --- |
-| `POST /uploads/image` | OWNER/AGENT/ADMIN | JSON `{ filename, data }` (base64 data URL). Rejects non-images and files ≥ 100 KB. Returns `{ url }` |
-
-### Blogs & Projects
-Standard CRUD: public reads; `ADMIN`-only create/update/delete
-(`GET /blogs`, `GET /blogs/:slug`, `GET /projects`, `GET /projects/:id`).
-
-## Pages (frontend)
-
-Home, Listings + details (with inquiry form + viewing request form),
-Agents, Projects, Blogs, Contact, Dashboard (profile, favorites, inquiries,
-my-properties, add-property, leads, admin users/projects, verification
-actions), **Viewings**, **Payments**, 404 page.
-
-## What was implemented in this pass
-
-1. **Security fixes:** public registration can no longer self-assign roles;
-   forbidden responses corrected to `403`; rate limiting on auth endpoints;
-   `.gitignore` + `.env.example` added.
-2. **Verification workflow:** `verificationStatus` + admin approve/reject,
-   public visibility rules, migration for pre-existing listings.
-3. **OWNER role:** new role with own-listing rights; dashboard tabs, analytics,
-   and admin role dropdown updated.
-4. **Viewings system:** model, conflict-checked API, buyer/agent/admin pages.
-5. **Payments sandbox:** model, API, history page, receipts only on confirm.
-6. **Local images:** 18 Unsplash images downloaded to
-   `frontend/public/images/`, all under 20 KB, all 44 references rewritten;
-   project/property default images localized too.
-7. **Agent image upload:** file input with "Image should be less than 100 KB"
-   note, client + server size enforcement, local storage under
-   `backend/src/uploads/`.
-8. **Docs:** this README + API reference.
-
-## Known limitations & next steps
-
-- **No local MongoDB in this environment**, so live DB testing was not run
-  here — run `npm run seed` + `npm run dev` with your own MongoDB and verify
-  the workflows (register → create listing → admin approves → buyer viewing
-  → sandbox payment).
-- **No real payment gateway** (by design — credentials were never provided).
-  Integrate one behind the payment service module when credentials exist.
-- **No email provider** — password reset and email verification are not
-  implemented; they need an email service (see master prompt §5).
-- **No automated tests** were added; add API tests for the new
-  viewing/payment/verification endpoints when time allows.
-- The Mapbox map background on the listings page and Dicebear avatars are
-  still remote third-party services (not local image assets).
-- Frontend still calls `http://localhost:5000/api` directly; for production,
-  move the API base URL into an environment variable.
+Public registration creates a USER account. Higher-privilege roles must be assigned by an admin.
+Listing and Viewing Workflows
+Listing approval
+1. An owner or agent submits a property.
+2. The listing is marked Pending.
+3. An admin approves or rejects it.
+4. Only approved listings appear in public property pages.
+Viewing appointments
+Viewings can be requested, confirmed, rescheduled, cancelled, or marked completed. The backend checks for overlapping active bookings for the same property or agent.
+Main Pages
+- Home and property listings
+- Property details
+- Agents directory
+- Projects and blogs
+- Contact page
+- User dashboards and profile
+- Favourites and inquiries
+- Property management and listing verification
+- Viewing appointments and payment records
+- 404 page
+Project Structure
+RealStateApp/
+├── backend/
+│   ├── src/
+│   │   ├── routes/
+│   │   ├── models/
+│   │   └── middleware/
+│   └── .env.example
+└── frontend/
+    ├── src/
+    │   ├── components/
+    │   ├── pages/
+    │   └── ...
+    └── public/
+        └── images/
+This is a simplified overview; exact folders may vary with the current codebase.
+Current Limitations
+- Payments use a sandbox flow; a live payment gateway is not integrated.
+- Email verification and password reset are not yet implemented.
+- Automated API tests for key workflows are planned.
+Security Notes
+- Authorization is enforced by the backend, not only by hiding frontend controls.
+- Do not publish production secrets, real credentials, or private environment files.
+- Demo accounts and seeded data are intended for local testing. Change or remove them before any public deployment.
+Future Improvements
+- Integrate a real payment provider.
+- Add email verification and password reset.
+- Add automated tests for listing verification, viewing appointments, and payment workflows.
